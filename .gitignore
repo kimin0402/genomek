@@ -1,10 +1,2 @@
-./genomek.egg-info/
-./genomek/__pycache__/
-./genomek/annotation/__pycache__/
-./genomek/bam/__pycache__/
-./genomek/botseq/__pycache__/
-./genomek/coverage/__pycache__/
-./genomek/signature/__pycache__/
-./genomek/tools/__pycache__/
-./genomek/vcf/__pycache__/
-./genomek/visualization/__pycache__/
+genomek.egg-info/
+__pycache__/
