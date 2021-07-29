@@ -2,6 +2,7 @@ import os
 import sys
 import psutil
 import itertools
+from collections import defaultdict
 
 
 revcompl = lambda x: ''.join([{'A':'T','C':'G','G':'C','T':'A','N':'N','[':'[',']':']','>':'>'}[B] for B in x][::-1])
@@ -11,7 +12,7 @@ def memory_usage():
     pid = os.getpid()
     py = psutil.Process(pid)
     memoryUse1 = py.memory_info()[0]/2.**30  # memory use in GB...I think
-    print('\n************** Reported Current Memory Use: '+ str(round(memoryUse1,2))+" GB *****************\n")
+    print('\n************** Reported Current Memory Use: '+ str(round(memoryUse1,2))+" GB *****************\n") 
     #print('\n************** Reported Current Memory Use: '+ str(round(memoryUse2,2))+" GB *****************\n")
 
 
@@ -35,3 +36,5 @@ def perm(n, seq):
 def print_err(*args, **kwargs):
     print(*args, file=sys.stderr, flush=True, **kwargs)
     return
+
+

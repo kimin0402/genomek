@@ -2,6 +2,9 @@
 import itertools
 import string
 import collections
+from pathlib import Path
+import re
+
 
 def expand(*args, **wildcards):
     """

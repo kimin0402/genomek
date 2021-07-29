@@ -224,8 +224,7 @@ class makeReadsinfo:
 			self.rplist = None
 			printErr(f'{self.chrom} {self.pos} chromosome not in the reference fasta')
 			return
-			
-
+		
 
 
 		# set basic attributes

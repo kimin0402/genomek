@@ -47,6 +47,7 @@ class readplus():
         self.MQ = read.mapping_quality
         self.BQ = None
         self.margins = ( read.reference_start, read.reference_end )
+        self.orientation = None
 
 
     def set_irrelevant_reads(self, start: int, end: int, flankLen: int=1):
@@ -83,7 +84,7 @@ class readplus():
                 break
 
 
-    def set_SVread(self, clip_threshold: int=0, template_length_threshold: int=1000):
+    def set_SVread(self, clip_threshold: int=0, template_length_threshold: int=2000):
         if self.lenClip > clip_threshold:
             self.is_SVread= True
             self.SVread_cause.append('clipping')
@@ -99,15 +100,6 @@ class readplus():
         if self.read.has_tag('SA'):
             self.is_SVread= True
             self.SVread_cause.append('SA tag')
-
-
-    def set_lowqual_reads(self, limMQ: int=20):
-        if self.is_SVread:
-            self.is_lowqual = True
-            self.lowqual_cause.append('SVread')
-        if self.read.mapping_quality <= limMQ:
-            self.is_lowqual = True
-            self.lowqual_cause.append('MQ')
 
 
     def set_pairs_list(self, start: int, end: int, flankLen: int=1):
@@ -126,7 +118,7 @@ class readplus():
                     break
                 
             self.pairs_before_REF = self.pairs[idx_REFstart - flankLen : idx_REFstart]
-            self.pairs_after_REF  = self.pairs[idx_nexttoREF : idx_nexttoREF]
+            self.pairs_after_REF  = self.pairs[idx_nexttoREF : idx_nexttoREF + flankLen]
             self.pairs_within_REF = self.pairs[idx_REFstart : idx_nexttoREF]
             self.query_pos_within_REF = [ x[0] for x in self.pairs_within_REF if x[0] != None ] 
                 # 0-based
@@ -183,16 +175,68 @@ class readplus():
             else:
                 self.LocaLt = self.query_pos_within_REF[0] + 1
                 self.LocaRt = self.read.query_length - self.query_pos_within_REF[-1] 
-                
 
-    def set_lowqual_by_MM(self, MMfrac):
+
+    def set_five_prime_distance(self):
+        if self.read.is_reverse:
+            self.distance = self.read.query_length - self.query_pos_within_REF[-1] 
+        else:
+            self.distance = self.query_pos_within_REF[0] + 1
+
+
+    def set_orientation(self):
+        if self.read.mate_is_unmapped or not self.read.is_paired or self.read.is_secondary or self.read.is_supplementary:
+            return
+        if self.read.reference_name != self.read.next_reference_name:
+            return
+
+        if self.read.is_reverse: 
+            self_orientation = 'R'
+        else: 
+            self_orientation = 'F'
+        if self.read.mate_is_reverse:
+            mate_orientation = 'R'
+        else:
+            mate_orientation = 'F'
+
+        if self.read.is_read1:
+            self_orientation += '1'
+            mate_orientation += '2'
+        elif self.read.is_read2:
+            self_orientation += '2'
+            mate_orientation += '1'
+        else: # if read is not paired orientation is set to 0
+            self_orientation += '0'
+            mate_orientation += '0'
+
+        if self.read.reference_start <= self.read.next_reference_start:
+            self.orientation = self_orientation + mate_orientation
+        else:
+            self.orientation = mate_orientation + self_orientation
+        return
+
+
+    def set_lowqual_SV(self):
+        if self.is_SVread:
+            self.is_lowqual = True
+            self.lowqual_cause.append('SVread')
+
+                
+    def set_lowqual_by_MM(self, MMfrac: float=0.1):
         if self.MM >= self.read.query_length * MMfrac:
             self.is_lowqual = True
             self.lowqual_cause.append('mismatch')
             #self.readclass = -1
+
+
+    def set_lowqual_MQ(self, limMQ: int=20):
+        if self.MQ != None:
+            if self.read.mapping_quality <= limMQ:
+                self.is_lowqual = True
+                self.lowqual_cause.append('MQ')
             
 
-    def set_lowqual_by_BQ(self, limBQ):
+    def set_lowqual_by_BQ(self, limBQ: int=20):
         if self.BQ != None:
             if self.BQ <= limBQ:
                 self.is_lowqual = True
@@ -400,14 +444,25 @@ class variant_edit():
             self.readclass_indices_highqual[i] = list()
             self.readclass_indices_lowqual[i] = list()
         for rp in self.rplist:
-            if rp.is_irrelevant == False:
+            if not rp.is_irrelevant:
                 if rp.is_lowqual:
                     self.readclass_indices_lowqual[rp.readclass].append( self.rplist.index(rp) )
                 else:
                     self.readclass_indices_highqual[rp.readclass].append( self.rplist.index(rp) )
 
+
     def get_format_values(self):
-        self.format_values = defaultdict(float)
+        self.format_values = {}
+        self.format_values['ref_read_all'] = 0
+        self.format_values['var_read_all'] = 0
+        self.format_values['other_read_all'] = 0
+        self.format_values['ref_read_highqual'] = 0
+        self.format_values['var_read_highqual'] = 0
+        self.format_values['other_read_highqual'] = 0
+        self.format_values['ref_read_lowqual'] = 0
+        self.format_values['var_read_lowqual'] = 0
+        self.format_values['other_read_lowqual'] = 0
+
         for rp in self.rplist:
             if rp.is_irrelevant:
                 continue
@@ -439,3 +494,7 @@ class variant_edit():
             self.format_values['vaf_highqual'] = np.nan
 
         return self.format_values
+
+
+    def get_info_values(self):
+        pass

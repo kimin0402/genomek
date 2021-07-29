@@ -7,7 +7,4 @@ from ._sigprofiler_wrapper import plot_portrait
 from ._sigprofiler_wrapper import single_decomposition
 from ._sigprofiler_wrapper import sample_decomposition
 from ._sigprofiler_wrapper import sample_decomposition_old
-from ._sigquick import sig_plot_12
-from ._sigquick import sig_plot_96
-from ._sigquick import sig_plot_192
-from ._sigquick import data_generation_96
+from ._sigquick import *
