@@ -431,6 +431,9 @@ def sample_decomposition(sample, signatures=None, mtype="", genome_build="GRCh37
     basis_cols.insert(0,sigDatabases_name)
 
     img = _plot_decomposition(sample_DF, sample_name, sigDatabases_DF[basis_cols], basis_names, weights, nonzero_exposures, mtype)
+    # resize image
+    w,h = img.size
+    img = img.resize((round(w/6), round(h/6)))
 
     sig_summary = pd.DataFrame({'Signature': basis_names, 'exposure': nonzero_exposures, 'prop': weights}).sort_values(by='exposure', ascending=False)
 

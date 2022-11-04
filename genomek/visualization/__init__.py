@@ -1,2 +1,3 @@
 from ._kataegis import kataegis
-from ._basic_plots import genome_figure
+from ._basic_plots import *
+from ._ideogram import ideogram

@@ -134,6 +134,39 @@ def matrix_to_seq(matrix):
     return seq
             
 
+def reads_to_read(reads: list, read_name: str) -> pysam.libcalignedsegment.AlignedSegment:
+    '''
+    Given a list of pysam alignment segments, return a compressed pysam alignment segment
+    '''
+    number_of_reads = len(reads)
+    max_query_length = max(x.query_length for x in reads)
+    for read in reads:
+        if read.query_length == max_query_length:
+            read_compressed = copy.deepcopy(read)
+            break
+
+    sequence_mtx = np.zeros((4, max_query_length))
+    for read in reads:
+        qualities = np.zeros(max_query_length)
+        qualities[0:len(read.query_qualities)] = read.query_qualities
+        sequence = read.query_sequence
+        sequence_mtx += seq_to_matrix(sequence, length=max_query_length) * qualities
+
+    qualities = array.array('B', (np.max(sequence_mtx, axis=0) / number_of_reads).astype(int))
+    sequence = matrix_to_seq(np.where(sequence_mtx == sequence_mtx.max(axis=0, keepdims=True), 1, 0).astype(int))
+
+    read_compressed.query_name = read_name
+    read_compressed.query_sequence = sequence
+    read_compressed.query_qualities = qualities
+
+    return read_compressed
+
+
+
+
+
+
+
 def collapse_umis_to_bam(k, v, read_orientation: str, output_bam: pysam.AlignmentFile):
     number_of_reads = len(v[read_orientation])
     if number_of_reads:

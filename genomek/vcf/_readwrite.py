@@ -9,17 +9,19 @@ import pysam
 import cyvcf2
 import pandas as pd
 from pandas.api.types import CategoricalDtype
+from pandas import DataFrame
+from ..tools._gadgets import print_err
 
 CSQ_columns = "Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|PICK|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|TSL|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|RefSeq|GENE_PHENO|NEAREST|SIFT|PolyPhen|DOMAINS|HGVS_OFFSET|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|AA_AF|EA_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|MAX_AF|MAX_AF_POPS|CLIN_SIG|SOMATIC|PHENO|PUBMED|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE"
 
-def read_vcf(vcf_path:str, hg38:bool = False) -> pd.DataFrame:
+def read_vcf(vcf_path:str, hg38:bool = False, just_four = False, use_category=True) -> pd.DataFrame:
     '''
     Input: vcf_path in string. supports both .gz and .vcf
     Output: pandas dataframe.
     hg38: default false. if set True, different chromosome strings will be used
     
-    Easiest way to load vcf files. Does not support format parsing.
-    CHROM column is converted to categorical dtype, and NAs in CHROM columns are removed.
+    Easiest way to load vcf files without parsing info and format fields.
+    The dtype of CHROM column is converted to categorical dtype, and NAs in CHROM column are removed.
     
     adopted from https://gist.github.com/dceoy/99d976a2c01e7f0ba1c813778f9db744
     '''
@@ -38,19 +40,156 @@ def read_vcf(vcf_path:str, hg38:bool = False) -> pd.DataFrame:
         with open(vcf_path, 'r') as f:
             lines = [l for l in f if not l.startswith('##')]
 
-    df = pd.read_csv(io.StringIO(''.join(lines)),
-                     dtype={'#CHROM': chrom_cat_type, 'POS': int, 
-                            'ID': str, 'REF': str, 'ALT': str,
-                            'QUAL': str, 'FILTER': str, 'INFO': str},
-                     sep='\t').rename(columns={'#CHROM': 'CHROM'})
+    if just_four:
+        df = pd.read_csv(io.StringIO(''.join(lines)),
+                         dtype={'#CHROM': chrom_cat_type, 'POS': int, 
+                                'ID': str, 'REF': str, 'ALT': str,
+                                'QUAL': str, 'FILTER': str, 'INFO': str},
+                         sep='\t', usecols=[0,1,3,4]).rename(columns={'#CHROM': 'CHROM'})
+        df = df.loc[~df['CHROM'].isna()]
 
-    df = df.loc[~df['CHROM'].isna()]
+    elif use_category:
+        df = pd.read_csv(io.StringIO(''.join(lines)),
+                         dtype={'#CHROM': chrom_cat_type, 'POS': int, 
+                                'ID': str, 'REF': str, 'ALT': str,
+                                'QUAL': str, 'FILTER': str, 'INFO': str},
+                         sep='\t').rename(columns={'#CHROM': 'CHROM'})
+        df = df.loc[~df['CHROM'].isna()]
+
+    else:
+        df = pd.read_csv(io.StringIO(''.join(lines)),
+                         dtype={'#CHROM': str, 'POS': int, 
+                                'ID': str, 'REF': str, 'ALT': str,
+                                'QUAL': str, 'FILTER': str, 'INFO': str},
+                         sep='\t').rename(columns={'#CHROM': 'CHROM'})
+
+    return df
+
+
+def read_pyvcf(vcf_path:str, biallelic:bool=False, hg38:bool=False, use_category=False) -> pd.DataFrame:
+    '''
+    vcf_path: string path to a vcf file. supports both .gz and .vcf
+    return: pandas dataframe
+    biallelic: if biallelic alt variant exists, set this as true with some time cost
+    hg38: if set true, chrom names will be appended with chr
+
+    Load a vcf file to pandas dataframe using pysam.
+    '''
+    if hg38:
+        chromosomes = ['chr'+str(i) for i in list(range(1, 23)) + ['X', 'Y', 'M']]
+    else:
+        chromosomes = [str(i) for i in list(range(1, 23)) + ['X', 'Y', 'MT']]
+    chrom_cat_type = CategoricalDtype(categories=chromosomes, ordered=True)
+
+    VCF = pysam.VariantFile(vcf_path)
+    if not biallelic:
+        if use_category:
+            df = pd.DataFrame.from_dict({i: {"CHROM":v.chrom, "POS":v.pos, "ID":v.id, "REF":v.ref, 
+                                            "ALT":",".join(v.alts or []), "QUAL":v.qual, "FILTER":";".join(v.filter),
+                                            **{info:data for info,data in v.info.items()},
+                                            **{f"{form}:::{sample}":data for sample,data_dict in v.samples.items() for form,data in data_dict.items()}
+                                            } for i, v in enumerate(VCF)}, orient='index').astype({"CHROM":chrom_cat_type}).convert_dtypes()
+        else: 
+            df = pd.DataFrame.from_dict({i: {"CHROM":v.chrom, "POS":v.pos, "ID":v.id, "REF":v.ref, 
+                                            "ALT":",".join(v.alts or []), "QUAL":v.qual, "FILTER":";".join(v.filter),
+                                            **{info:data for info,data in v.info.items()},
+                                            **{f"{form}:::{sample}":data for sample,data_dict in v.samples.items() for form,data in data_dict.items()}
+                                            } for i, v in enumerate(VCF)}, orient='index').convert_dtypes()
+    else:
+        n = len([i for i in VCF.fetch(reopen=True)]) # variant number
+        print_err("this option is not supported")
+        return None
+
     return df
 
 
 
 
-def _vcftotsv(vcf_path:str = "", info=None, format=None, sample=None, human=False, na="NA") -> pd.DataFrame:
+def df_to_vcf(df:pd.DataFrame, vcf_path:str, format_sample_separator:str=':::') -> None:
+    '''
+    convert df to vcf 
+    prototype work
+    does not support dataframe created from biallelic variants
+    VCF datatypes have property called 'Number'. This function dose not allow A, R, G as 'Number'
+    '''
+    def check_dtype(dtype):
+        try:
+            if dtype.kind in 'iu':
+                Type = 'Integer'
+                Number = 1
+            if dtype.kind == 'f':
+                Type = 'Float'
+                Number = 1
+            if dtype.kind == 'b':
+                Type = 'Flag'
+                Number = 0   
+            if dtype == 'string':
+                Type = 'String'
+                Number = 1
+            return Type, Number
+        except:
+            return None
+
+    def pdDtype_to_vcfDtype(value, dtype):
+        if pd.isna(value):
+            return None
+        elif dtype in ("Integer", "Float", "Flag"):
+            return value.item()
+        elif dtype in ("String"):
+            return value
+
+    df = df.convert_dtypes()
+    header = pysam.VariantHeader()
+    sample_id_list = {x.split(format_sample_separator)[1] for x in df.columns if format_sample_separator in x}
+    format_name_list = {x.split(format_sample_separator)[0] for x in df.columns if format_sample_separator in x}
+
+    for filter_entry in df['FILTER'].str.split(";").explode().unique():
+        header.add_meta("FILTER", items=[('ID', filter_entry), ('Description', 'No Description')])
+    for chrom in df['CHROM'].cat.categories:
+        header.add_meta("contig", items=[('ID', chrom)])
+
+    info_column_list = []
+    for col_name, dtype in df.dtypes[7:].items():
+        if ':::' in col_name:
+            continue
+        if not(Type_Number := check_dtype(dtype)):
+            continue
+        info_column_list.append((col_name, Type_Number[0]))
+        header.add_meta("INFO", items=[('ID', col_name), ('Number', Type_Number[1]), ('Type', Type_Number[0])])
+    
+    format_column_list = []
+    for col_name, dtype in [(format_name, pd.concat([df[i] for i in df.filter(regex=f"^{format_name}:::").dropna(axis=1, how='all')]).convert_dtypes().dtype) for format_name in format_name_list]:
+        if not(Type_Number := check_dtype(dtype)):
+            continue
+        format_column_list.append((col_name, Type_Number[0]))
+        header.add_meta("FORMAT", items=[('ID', col_name), ('Number', Type_Number[1]), ('Type', Type_Number[0])])
+    
+    for sample_id in sample_id_list:
+        header.add_sample(sample_id)
+
+    vcf_out = pysam.VariantFile(vcf_path, 'w', header=header)
+    for row in df.itertuples(index=True):
+        v = header.new_record()
+        v.chrom = getattr(row, 'CHROM')
+        v.pos = getattr(row, 'POS')
+        v.id = None if getattr(row, 'ID') == '.' else getattr(row, 'ID')
+        v.ref = getattr(row, 'REF')
+        v.alts = (getattr(row, 'ALT'),)
+        v.qual = None if str(getattr(row, 'QUAL')) == '.' else float(getattr(row, 'QUAL'))
+        v.filter.add(getattr(row, 'FILTER'))
+        for info_col, info_dtype in info_column_list:
+            test_v = v
+            v.info[info_col] = pdDtype_to_vcfDtype(getattr(row, info_col, None), info_dtype)
+        for sample_id in sample_id_list:
+            for format_col, format_dtype in format_column_list:
+                v.samples[sample_id][format_col] = pdDtype_to_vcfDtype(row[df.columns.tolist().index(f"{format_col}:::{sample_id}")+1], format_dtype)
+        vcf_out.write(v)
+    vcf_out.close()
+    return None
+
+
+
+def _vcftotsv(vcf_path:str = "", info=None, format=None, sample=None, human=False, na="NA", use_category=True) -> pd.DataFrame:
     '''
     vcf: Input vcf file path. May be vcf, vcf.gz, bcf, or bcf.gz.
     info: Comma-separated list of INFO fields to include. If not set, all fields are included.
@@ -182,7 +321,7 @@ def _vcftotsv(vcf_path:str = "", info=None, format=None, sample=None, human=Fals
         
         ofile.flush()    
 
-        df = read_vcf(ofile.name)
+        df = read_vcf(ofile.name, use_category=use_category)
 
     return df 
 
@@ -341,6 +480,8 @@ class tidydf:
     def __init__(self, vcf_path, info=None, format=None, sample=None, human=False, na="NA"):
         self.df = _vcftotsv(vcf_path=vcf_path, info=info, format=format, sample=sample, human=human, na=na)
         self.vcf_path = os.path.abspath(vcf_path)
+
+
     def tsvtovcf(self, output_path="", output_format="z"):
         print("Warning: the new vcf does not have proper data type specification at the header")
 
@@ -361,6 +502,44 @@ class tidydf:
 
             # Write tsv to vcf
             _tsvtovcf(tsv=tmp_tsv_path, output=output_path, vcf=self.vcf_path, O=output_format, na='.', d=':::')
+
+
+
+class df_vcf(DataFrame):
+    @classmethod
+    def new(cls, vcf_path, info=None, format=None, sample=None, human=False, na="NA", use_category=True):
+        df = _vcftotsv(vcf_path=vcf_path, info=info, format=format, sample=sample, human=human, na=na, use_category=use_category)
+        df.__class__ = df_vcf
+        df[['ID', 'QUAL', 'FILTER']] = df[['ID', 'QUAL', 'FILTER']].fillna('.')
+        df.vcf_path = os.path.abspath(vcf_path)
+        return df
+
+    def to_vcf(self, vcf_path="", format_sample_separator:str=':::'):
+        df_to_vcf(self, vcf_path=vcf_path, format_sample_separator=format_sample_separator)
+        
+    def tsvtovcf(self, output_path="", output_format="z"):
+        print("Warning: the new vcf does not have proper data type specification at the header")
+
+        # Index original vcf file just in case
+        cmd = f'bcftools index {self.vcf_path}'    
+        subprocess.run(cmd, shell=True)
+
+        # Write df to tsv at a temporary file
+        with tempfile.TemporaryDirectory() as tempdir:
+            tmp_tsv_path = f"{tempdir}/tmp.tsv"
+
+            # Write df to tsv
+            try: 
+                df_to_save = self.df.drop('VAR_TYPE', axis=1).copy()
+            except: 
+                df_to_save = self.df.copy()
+            df_to_save.rename(columns={'CHROM': '#CHROM'}).to_csv(tmp_tsv_path, sep='\t', na_rep='.', index=False)
+
+            # Write tsv to vcf
+            _tsvtovcf(tsv=tmp_tsv_path, output=output_path, vcf=self.vcf_path, O=output_format, na='.', d=':::')
+
+    # def __repr__(self):
+    #     return f"pandas core frame DataFrame with vcf functionality"
 
 
 

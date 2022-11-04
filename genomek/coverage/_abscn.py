@@ -14,5 +14,12 @@ def absolute_copy(cov1, cov2, C_cov, N_cov, ploidy, acf):
         return None
 
 
-    
-    
+def absolute_copy_from_ratio(dr, pu, pl, adr, cnn=2):
+    '''
+    for sequenza output
+    dr = depth ratio
+    pu = purity
+    pl = ploidy
+    adr = average depth ratio
+    '''
+    return (dr/adr*(pu*pl/2+1-pu) - (1-pu))/pu*cnn

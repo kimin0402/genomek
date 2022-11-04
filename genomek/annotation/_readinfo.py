@@ -12,6 +12,13 @@ stackDict_path = '/home/users/pjh/scripts/annotation/short_variants/max_readstac
 stackDict = {k:v for k, v in np.genfromtxt('/home/users/pjh/scripts/annotation/short_variants/max_readstack.txt', dtype=int)}
 
 
+def calculate_mean_med(x):
+    if x == None or x == []:
+        return None, None
+    else:
+        return np.mean(x), int(np.median(x))
+
+
 def get_mttype(ref: str, alt:str) -> str:
     if len(ref) == len(alt):
         return 'snv' if len(ref) == 1 else 'mnv'
@@ -24,11 +31,36 @@ def get_mttype(ref: str, alt:str) -> str:
             return 'del'
 
 
+def read_filter_basic(read):
+    if read.is_secondary or read.is_supplementary or read.is_duplicate or read.is_unmapped or read.mate_is_unmapped:
+        return True
+    return False
+
+def find_mate(read, bam):
+    for mate_read in bam.fetch(read.next_reference_name, read.next_reference_start, read.next_reference_start + 1):
+        if mate_read.query_name == read.query_name:
+            if mate_read.is_read1 != read.is_read1 or mate_read.reference_start != read.reference_start or mate_read.reference_end != read.reference_end or mate_read.reference_name != read.reference_name:
+                return mate_read
+    return None
+
+def add_mate_to_readdict(readdict, bam):
+    for read_name, read_list in readdict.items():
+        if len(read_list) == 1:
+            original_read = read_list[0]
+            if read_filter_basic(original_read):
+                continue
+            mate_read = find_mate(original_read, bam)
+            if read_filter_basic(mate_read):
+                continue
+            read_list.append(mate_read)
+    return None   
+    
+
 class readplus():
     def __init__(self, read):
         self.read = read
         try:
-            self.pairs = read.get_aligned_pairs(with_seq = True)
+            self.pairs = read.get_aligned_pairs(with_seq=True)
         except ValueError: # when MD tag is absent, get_aligned_pairs method fails with ValueError
             self.pairs = None
             return
@@ -54,22 +86,22 @@ class readplus():
         if not (start - self.read.reference_start >= flankLen and self.read.reference_end - end >= flankLen ):
             self.is_irrelevant = True
             self.irrelevant_cause.append('insufficient_flanking_sequences')
-        elif self.read.has_tag('MD') == False:
+        elif not self.read.has_tag('MD'):
             self.is_irrelevant = True
             self.irrelevant_cause.append('absent_MD_tag')
-        elif self.read.is_unmapped == True:
+        elif self.read.is_unmapped:
             self.is_irrelevant = True
             self.irrelevant_cause.append('flag_unmapped')
-        elif self.read.is_duplicate == True:
+        elif self.read.is_duplicate:
             self.is_irrelevant = True
             self.irrelevant_cause.append('flag_duplicate')
-        elif self.read.is_supplementary == True:
+        elif self.read.is_supplementary:
             self.is_irrelevant = True
             self.irrelevant_cause.append('flag_supplementary')
-        elif self.read.is_secondary == True:
+        elif self.read.is_secondary:
             self.is_irrelevant = True
             self.irrelevant_cause.append('flag_secondary')
-        elif self.read.is_qcfail == True:
+        elif self.read.is_qcfail:
             self.is_irrelevant = True
             self.irrelevant_cause.append('flag_qcfail')
         else:
@@ -102,7 +134,7 @@ class readplus():
             self.SVread_cause.append('SA tag')
 
 
-    def set_pairs_list(self, start: int, end: int, flankLen: int=1):
+    def set_pairs_list(self, start: int, end: int, flankLen: int=0):
         if self.is_irrelevant:
             self.pairs_before_REF = None
             self.pairs_after_REF  = None
@@ -110,15 +142,14 @@ class readplus():
             self.query_pos_within_REF = None
             self.seq_within_REF = None
         else:
-            for x in self.pairs:
-                if x[1] == start:
-                    idx_REFstart = self.pairs.index(x)
-                if x[1] == end:
-                    idx_nexttoREF = self.pairs.index(x)
-                    break
+            idx_REFstart = list(zip(*self.pairs))[1].index(start)
+            idx_nexttoREF = idx_REFstart + (end - start)
                 
+            try:
+                self.pairs_after_REF  = self.pairs[idx_nexttoREF : idx_nexttoREF + flankLen]
+            except:
+                self.pairs_after_REF = []
             self.pairs_before_REF = self.pairs[idx_REFstart - flankLen : idx_REFstart]
-            self.pairs_after_REF  = self.pairs[idx_nexttoREF : idx_nexttoREF + flankLen]
             self.pairs_within_REF = self.pairs[idx_REFstart : idx_nexttoREF]
             self.query_pos_within_REF = [ x[0] for x in self.pairs_within_REF if x[0] != None ] 
                 # 0-based
@@ -137,7 +168,7 @@ class readplus():
                     return False
             return True
 
-        if check_flanking(self.pairs_before_REF, self.pairs_after_REF) == False:
+        if not check_flanking(self.pairs_before_REF, self.pairs_after_REF):
             #self.is_lowqual = True
             self.readclass = 2
         else:
@@ -178,10 +209,13 @@ class readplus():
 
 
     def set_five_prime_distance(self):
-        if self.read.is_reverse:
-            self.distance = self.read.query_length - self.query_pos_within_REF[-1] 
+        if len(self.query_pos_within_REF):
+            if self.read.is_reverse:
+                self.Distance = self.read.query_length - self.query_pos_within_REF[-1] 
+            else:
+                self.Distance = self.query_pos_within_REF[0] + 1
         else:
-            self.distance = self.query_pos_within_REF[0] + 1
+            self.Distance = None
 
 
     def set_orientation(self):
@@ -216,20 +250,20 @@ class readplus():
         return
 
 
-    def set_lowqual_SV(self):
+    def set_lowqual_by_SV(self):
         if self.is_SVread:
             self.is_lowqual = True
             self.lowqual_cause.append('SVread')
 
                 
-    def set_lowqual_by_MM(self, MMfrac: float=0.1):
+    def set_lowqual_by_MM(self, MMfrac: float=0.3):
         if self.MM >= self.read.query_length * MMfrac:
             self.is_lowqual = True
             self.lowqual_cause.append('mismatch')
             #self.readclass = -1
 
 
-    def set_lowqual_MQ(self, limMQ: int=20):
+    def set_lowqual_by_MQ(self, limMQ: int=20):
         if self.MQ != None:
             if self.read.mapping_quality <= limMQ:
                 self.is_lowqual = True
@@ -451,17 +485,17 @@ class variant_edit():
                     self.readclass_indices_highqual[rp.readclass].append( self.rplist.index(rp) )
 
 
-    def get_format_values(self):
-        self.format_values = {}
-        self.format_values['ref_read_all'] = 0
-        self.format_values['var_read_all'] = 0
-        self.format_values['other_read_all'] = 0
-        self.format_values['ref_read_highqual'] = 0
-        self.format_values['var_read_highqual'] = 0
-        self.format_values['other_read_highqual'] = 0
-        self.format_values['ref_read_lowqual'] = 0
-        self.format_values['var_read_lowqual'] = 0
-        self.format_values['other_read_lowqual'] = 0
+    def get_read_count(self):
+        self.read_count = {}
+        self.read_count['ref_read_all'] = 0
+        self.read_count['var_read_all'] = 0
+        self.read_count['other_read_all'] = 0
+        self.read_count['ref_read_highqual'] = 0
+        self.read_count['var_read_highqual'] = 0
+        self.read_count['other_read_highqual'] = 0
+        self.read_count['ref_read_lowqual'] = 0
+        self.read_count['var_read_lowqual'] = 0
+        self.read_count['other_read_lowqual'] = 0
 
         for rp in self.rplist:
             if rp.is_irrelevant:
@@ -470,31 +504,217 @@ class variant_edit():
             class_string = 'ref' if rp.readclass == 0 else ('var' if rp.readclass == 1 else 'other')
             qual_string = 'lowqual' if rp.is_lowqual else 'highqual'
 
-            self.format_values[f'{class_string}_read_all'] += 1
-            self.format_values[f'{class_string}_read_{qual_string}'] += 1
-
-            # if rp.read.is_reverse:
-            #     self.format_values[f'{class_string}_read_all_reverse'] += 1
-            #     self.format_values[f'{class_string}_read_{qual_string}_reverse'] += 1
+            self.read_count[f'{class_string}_read_all'] += 1
+            self.read_count[f'{class_string}_read_{qual_string}'] += 1
         
         Nread_all = \
-                self.format_values['ref_read_highqual'] + self.format_values['var_read_highqual'] + self.format_values['other_read_highqual'] + \
-                self.format_values['ref_read_lowqual'] + self.format_values['var_read_lowqual'] + self.format_values['other_read_lowqual']
+                self.read_count['ref_read_highqual'] + self.read_count['var_read_highqual'] + self.read_count['other_read_highqual'] + \
+                self.read_count['ref_read_lowqual'] + self.read_count['var_read_lowqual'] + self.read_count['other_read_lowqual']
         Nread_highqual = \
-                self.format_values['ref_read_highqual'] + self.format_values['var_read_highqual'] + self.format_values['other_read_highqual']
+                self.read_count['ref_read_highqual'] + self.read_count['var_read_highqual'] + self.read_count['other_read_highqual']
 
         if Nread_all != 0:
-            self.format_values['vaf_all'] = ( self.format_values['var_read_highqual'] + self.format_values['var_read_lowqual'] ) / Nread_all
+            self.read_count['vaf_all'] = ( self.read_count['var_read_highqual'] + self.read_count['var_read_lowqual'] ) / Nread_all
         else: 
-            self.format_values['vaf_all'] = np.nan
+            self.read_count['vaf_all'] = np.nan
             
         if Nread_highqual != 0:
-            self.format_values['vaf_highqual'] = self.format_values['var_read_highqual'] / Nread_highqual
+            self.read_count['vaf_highqual'] = self.read_count['var_read_highqual'] / Nread_highqual
         else: 
-            self.format_values['vaf_highqual'] = np.nan
+            self.read_count['vaf_highqual'] = np.nan
 
-        return self.format_values
+        return self.read_count
+
+
+    def get_read_count_reverse(self):
+        self.read_count_reverse = {}
+        self.read_count_reverse['ref_read_all'] = 0
+        self.read_count_reverse['ref_read_all_reverse'] = 0
+        self.read_count_reverse['var_read_all'] = 0
+        self.read_count_reverse['var_read_all_reverse'] = 0
+        self.read_count_reverse['other_read_all'] = 0
+        self.read_count_reverse['other_read_all_reverse'] = 0
+        self.read_count_reverse['ref_read_highqual'] = 0
+        self.read_count_reverse['ref_read_highqual_reverse'] = 0
+        self.read_count_reverse['var_read_highqual'] = 0
+        self.read_count_reverse['var_read_highqual_reverse'] = 0
+        self.read_count_reverse['other_read_highqual'] = 0
+        self.read_count_reverse['other_read_highqual_reverse'] = 0
+        self.read_count_reverse['ref_read_lowqual'] = 0
+        self.read_count_reverse['ref_read_lowqual_reverse'] = 0
+        self.read_count_reverse['var_read_lowqual'] = 0
+        self.read_count_reverse['var_read_lowqual_reverse'] = 0
+        self.read_count_reverse['other_read_lowqual'] = 0
+        self.read_count_reverse['other_read_lowqual_reverse'] = 0
+
+        for rp in self.readsinfo.rplist:
+            if rp.irrelevant:
+                continue
+
+            class_string = 'ref' if rp.readclass == 0 else ('var' if rp.readclass == 1 else 'other')
+            qual_string = 'lowqual' if rp.lowqual else 'highqual'
+
+            self.read_count_reverse[f'{class_string}_read_all'] += 1
+            self.read_count_reverse[f'{class_string}_read_{qual_string}'] += 1
+
+            if rp.read.is_reverse:
+                self.read_count_reverse[f'{class_string}_read_all_reverse'] += 1
+                self.read_count_reverse[f'{class_string}_read_{qual_string}_reverse'] += 1
+        
+        Nread_all = \
+                self.read_count_reverse['ref_read_highqual'] + self.read_count_reverse['var_read_highqual'] + self.read_count_reverse['other_read_highqual'] + \
+                self.read_count_reverse['ref_read_lowqual'] + self.read_count_reverse['var_read_lowqual'] + self.read_count_reverse['other_read_lowqual']
+        Nread_highqual = \
+                self.read_count_reverse['ref_read_highqual'] + self.read_count_reverse['var_read_highqual'] + self.read_count_reverse['other_read_highqual']
+
+        if Nread_all != 0:
+            self.read_count_reverse['vaf_all'] = ( self.read_count_reverse['var_read_highqual'] + self.read_count_reverse['var_read_lowqual'] ) / Nread_all
+        else: 
+            self.read_count_reverse['vaf_all'] = format_MISSING_float
+            
+        if Nread_highqual != 0:
+            self.read_count_reverse['vaf_highqual'] = self.read_count_reverse['var_read_highqual'] / Nread_highqual
+        else: 
+            self.read_count_reverse['vaf_highqual'] = format_MISSING_float
+
+        return self.read_count_reverse
+
+
+    def get_MQ_BQ_MM(self):
+        self.MQ_BQ_MM = {}
+        self.MQ_BQ_MM['ref_all_meanMQ'] = 0
+        self.MQ_BQ_MM['var_all_meanMQ'] = 0
+        self.MQ_BQ_MM['ref_lowqual_meanMQ'] = 0
+        self.MQ_BQ_MM['var_lowqual_meanMQ'] = 0
+        self.MQ_BQ_MM['ref_all_medMQ'] = 0
+        self.MQ_BQ_MM['var_all_medMQ'] = 0
+        self.MQ_BQ_MM['ref_lowqual_medMQ'] = 0
+        self.MQ_BQ_MM['var_lowqual_medMQ'] = 0
+        self.MQ_BQ_MM['ref_all_meanBQ'] = 0
+        self.MQ_BQ_MM['var_all_meanBQ'] = 0
+        self.MQ_BQ_MM['ref_lowqual_meanBQ'] = 0
+        self.MQ_BQ_MM['var_lowqual_meanBQ'] = 0
+        self.MQ_BQ_MM['ref_all_medBQ'] = 0
+        self.MQ_BQ_MM['var_all_medBQ'] = 0
+        self.MQ_BQ_MM['ref_lowqual_medBQ'] = 0
+        self.MQ_BQ_MM['var_lowqual_medBQ'] = 0
+        self.MQ_BQ_MM['ref_all_meanMM'] = 0
+        self.MQ_BQ_MM['var_all_meanMM'] = 0
+        self.MQ_BQ_MM['ref_lowqual_meanMM'] = 0
+        self.MQ_BQ_MM['var_lowqual_meanMM'] = 0
+        self.MQ_BQ_MM['ref_all_medMM'] = 0
+        self.MQ_BQ_MM['var_all_medMM'] = 0
+        self.MQ_BQ_MM['ref_lowqual_medMM'] = 0
+        self.MQ_BQ_MM['var_lowqual_medMM'] = 0
+
+        def select_readclass_highqual(field, readclass):
+            tmp = list()
+            for idx in self.readclass_indices_highqual[readclass]:
+                val = getattr(self.rplist[idx], field)
+                if val != None:
+                    tmp.append(val)
+            return tmp
+
+        def select_readclass_lowqual(field, readclass):
+            tmp = list()
+            for idx in self.readclass_indices_lowqual[readclass]:
+                val = getattr(self.rplist[idx], field)
+                if val != None:
+                    tmp.append(val)
+            return tmp
+
+        self.MQ_BQ_MM['ref_all_meanMQ'], self.MQ_BQ_MM['ref_all_medMQ'] = calculate_mean_med(select_readclass_highqual('MQ', 0) + select_readclass_lowqual('MQ', 0))
+        self.MQ_BQ_MM['ref_lowqual_meanMQ'], self.MQ_BQ_MM['ref_lowqual_medMQ'] = calculate_mean_med(select_readclass_lowqual('MQ', 0))
+        self.MQ_BQ_MM['var_all_meanMQ'], self.MQ_BQ_MM['var_all_medMQ'] = calculate_mean_med(select_readclass_highqual('MQ', 1) + select_readclass_lowqual('MQ', 1))
+        self.MQ_BQ_MM['var_lowqual_meanMQ'], self.MQ_BQ_MM['var_lowqual_medMQ'] = calculate_mean_med(select_readclass_lowqual('MQ', 1))
+        self.MQ_BQ_MM['ref_all_meanBQ'], self.MQ_BQ_MM['ref_all_medBQ'] = calculate_mean_med(select_readclass_highqual('BQ', 0) + select_readclass_lowqual('BQ', 0))
+        self.MQ_BQ_MM['ref_lowqual_meanBQ'], self.MQ_BQ_MM['ref_lowqual_medBQ'] = calculate_mean_med(select_readclass_lowqual('BQ', 0))
+        self.MQ_BQ_MM['var_all_meanBQ'], self.MQ_BQ_MM['var_all_medBQ'] = calculate_mean_med(select_readclass_highqual('BQ', 1) + select_readclass_lowqual('BQ', 1))
+        self.MQ_BQ_MM['var_lowqual_meanBQ'], self.MQ_BQ_MM['var_lowqual_medBQ'] = calculate_mean_med(select_readclass_lowqual('BQ', 1))
+        self.MQ_BQ_MM['ref_all_meanMM'], self.MQ_BQ_MM['ref_all_medMM'] = calculate_mean_med(select_readclass_highqual('MM', 0) + select_readclass_lowqual('MM', 0))
+        self.MQ_BQ_MM['ref_lowqual_meanMM'], self.MQ_BQ_MM['ref_lowqual_medMM'] = calculate_mean_med(select_readclass_lowqual('MM', 0))
+        self.MQ_BQ_MM['var_all_meanMM'], self.MQ_BQ_MM['var_all_medMM'] = calculate_mean_med(select_readclass_highqual('MM', 1) + select_readclass_lowqual('MM', 1))
+        self.MQ_BQ_MM['var_lowqual_meanMM'], self.MQ_BQ_MM['var_lowqual_medMM'] = calculate_mean_med(select_readclass_lowqual('MM', 1))
+
+        return self.MQ_BQ_MM
+
+
+    def get_Loca_Distance_Other(self):
+        self.get_Loca_Distance_Other = {}
+        self.get_Loca_Distance_Other['meanLocaLt_all'] = 0
+        self.get_Loca_Distance_Other['medLocaLt_all'] = 0
+        self.get_Loca_Distance_Other['meanLocaRt_all'] = 0
+        self.get_Loca_Distance_Other['medLocaRt_all'] = 0
+        self.get_Loca_Distance_Other['meanDistance_all'] = 0
+        self.get_Loca_Distance_Other['medDistance_all'] = 0
+        self.get_Loca_Distance_Other['ref_ClipCnt_all'] = 0
+        self.get_Loca_Distance_Other['var_ClipCnt_all'] = 0
+        self.get_Loca_Distance_Other['ref_InsCnt_all'] = 0
+        self.get_Loca_Distance_Other['var_InsCnt_all'] = 0
+        self.get_Loca_Distance_Other['ref_DelCnt_all'] = 0
+        self.get_Loca_Distance_Other['var_DelCnt_all'] = 0
+
+        def select_readclass_highqual(field, readclass):
+            tmp = list()
+            for idx in self.readclass_indices_highqual[readclass]:
+                val = getattr(self.rplist[idx], field)
+                if val != None:
+                    tmp.append(val)
+            return tmp
+
+        def select_readclass_lowqual(field, readclass):
+            tmp = list()
+            for idx in self.readclass_indices_lowqual[readclass]:
+                val = getattr(self.rplist[idx], field)
+                if val != None:
+                    tmp.append(val)
+            return tmp
+
+        self.get_Loca_Distance_Other['meanLocaLt_all'], self.get_Loca_Distance_Other['medLocaLt_all'] = calculate_mean_med(select_readclass_highqual('LocaLt', 1) + select_readclass_lowqual('LocaLt', 1))
+        self.get_Loca_Distance_Other['meanLocaRt_all'], self.get_Loca_Distance_Other['medLocaRt_all'] = calculate_mean_med(select_readclass_highqual('LocaRt', 1) + select_readclass_lowqual('LocaRt', 1))
+        self.get_Loca_Distance_Other['meanDistance_all'], self.get_Loca_Distance_Other['medDistance_all'] = calculate_mean_med(select_readclass_highqual('Distance', 1) + select_readclass_lowqual('Distance', 1))
+
+        self.get_Loca_Distance_Other['ref_ClipCnt_all'] = len( [ y for y in select_readclass_highqual('lenClip', 0) + select_readclass_lowqual('lenClip', 0) if y > 0 ] )
+        self.get_Loca_Distance_Other['var_ClipCnt_all'] = len( [ y for y in select_readclass_highqual('lenClip', 1) + select_readclass_lowqual('lenClip', 1) if y > 0 ] )
+        self.get_Loca_Distance_Other['ref_InsCnt_all'] = len( [ y for y in select_readclass_highqual('lenIns', 0) + select_readclass_lowqual('lenIns', 0) if y > 0 ] )
+        self.get_Loca_Distance_Other['var_InsCnt_all'] = len( [ y for y in select_readclass_highqual('lenIns', 1) + select_readclass_lowqual('lenIns', 1) if y > 0 ] )
+        self.get_Loca_Distance_Other['ref_DelCnt_all'] = len( [ y for y in select_readclass_highqual('lenDel', 0) + select_readclass_lowqual('lenDel', 0) if y > 0 ] )
+        self.get_Loca_Distance_Other['var_DelCnt_all'] = len( [ y for y in select_readclass_highqual('lenDel', 1) + select_readclass_lowqual('lenDel', 1) if y > 0 ] )
+
+        return self.get_Loca_Distance_Other
 
 
     def get_info_values(self):
         pass
+
+
+def position_to_vafall(CHROM, POS, REF, ALT, bam: pysam.AlignmentFile, ref_ver:str='37'):
+    '''
+    Chrom, Pos, Ref, Alt 만 알 때 빠르게 vaf_all 만 bam file 에서 알고 싶을 때 쓰면 좋을 것 같다.
+    
+    returns: dictionary of {'vaf_all': some value}
+
+    '''
+    variant = variant_edit(CHROM, POS, REF, ALT, ref_ver=ref_ver)
+    variant.fetch_reads(bam)
+    variant.reads_to_readplus()
+    if not variant.rplist:
+        result = {'vaf_all': 0}
+        return 0
+    variant.modify_readclass_by_mateoverlap()
+    ref_var_other = {'ref':0, 'var':0, 'other':0}
+    for rp in variant.rplist:
+        rp.set_irrelevant_reads(start=variant.start, end=variant.end, flankLen=0)
+        rp.set_pairs_list(start=variant.start, end=variant.end, flankLen=0)
+        if rp.is_irrelevant:
+            continue
+        rp.set_alleleClass(REF=variant.REF, ALT=variant.ALT)
+        class_string = 'ref' if rp.readclass == 0 else ('var' if rp.readclass == 1 else 'other')
+        ref_var_other[class_string] += 1
+    Nread_all = ref_var_other['ref'] + ref_var_other['var'] + ref_var_other['other']
+    if Nread_all != 0:
+        vaf_all = ref_var_other['var'] / Nread_all
+    else:
+        vaf_all = 0
+    result = {'vaf_all': vaf_all}
+    return vaf_all

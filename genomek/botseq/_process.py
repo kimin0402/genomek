@@ -56,7 +56,49 @@ def check_interval_isin_pr(interval: pr.PyRanges, bed: pr.PyRanges) -> bool:
     return interval.count_overlaps(bed).as_df().loc[0, 'NumberOverlaps'] > 0
 
 
+def blat_a_sequence(sequence: str, sequence_name: str,
+                    blat_path: str='/home/users/kimin/tools/blat/gfClient', 
+                    reference_dir_path: str="/home/users/kimin/projects/00_Reference/",
+                    port: int=2882, minScore: int=20, minIdentity: int=20) -> list:
+    NUMT_tsv_path = "/home/users/kimin/projects/12_MT/00_reference/GRCh37_NumtS.tsv"
+    NUMT_pr = pr.PyRanges(df=pd.read_csv(NUMT_tsv_path, sep='\t', index_col=None, usecols=[1,2,3,6]))
+    input_dict = {sequence_name: sequence}
+    result = []
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        query_fasta_path = f"{temp_dir}/temp.fa"
+        output_psl_path = f"{temp_dir}/temp.psl"
+        seqdict_to_fasta(input_dict, query_fasta_path)
+        cmd = f"{blat_path} -minScore={minScore} -minIdentity={minIdentity} 127.0.0.1 {port} {reference_dir_path} {query_fasta_path} {output_psl_path}"
+        subprocess.run(cmd, shell=True)
+
+        df = psl_to_df(output_psl_path)
+        if len(df.query("CHROM == 'MT'")):
+            MT_top_entry = df.query("CHROM == 'MT'").iloc[0]
+        else:
+            MT_top_entry = {'CHROM': 'MT', 'Range': (0,0), 'Score': None, 'Pct': None}
+        if len(df.query("CHROM != 'MT'")):
+            NU_top_entry = df.query("CHROM != 'MT'").iloc[0]
+            NU_top_pr = pr.PyRanges(chromosomes=[NU_top_entry['CHROM']], starts=[NU_top_entry['Range'][0]], ends=[NU_top_entry['Range'][1]])
+            NUMT = check_interval_isin_pr(NU_top_pr, NUMT_pr)
+        else:
+            NU_top_entry = {'CHROM': None, 'Range': (0,0), 'Score': None, 'Pct': None}
+            NUMT = False
+        Top_three_string = ','.join([f"{getattr(row, 'CHROM')}:{getattr(row, 'Range')[0]}-{getattr(row, 'Range')[1]} {getattr(row, 'Score'):.2f} {getattr(row, 'Pct'):.2f}" for row in df.iloc[0:3].itertuples()])
+
+        result.append(NUMT)
+        result.append(f"{NU_top_entry['CHROM']}:{NU_top_entry['Range'][0]}-{NU_top_entry['Range'][1]}")
+        result.append(NU_top_entry['Score'])
+        result.append(NU_top_entry['Pct'])
+        result.append(f"{MT_top_entry['CHROM']}:{MT_top_entry['Range'][0]}-{MT_top_entry['Range'][1]}")
+        result.append(MT_top_entry['Score'])
+        result.append(MT_top_entry['Pct'])
+        result.append(Top_three_string)
+
+    return result
+
 @cached(cache={}, key=lambda umis_key, umis_set: hashkey(umis_key))
+
 def blat_umis_reads(umis_key: str, umis_set: dict , 
                     blat_path: str='/home/users/kimin/tools/blat/gfClient', 
                     reference_dir_path: str="/home/users/kimin/projects/00_Reference/",
