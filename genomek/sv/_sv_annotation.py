@@ -5,11 +5,10 @@ from ..tools import print_err
 from ..tools import get_vaf
 from ..tools._gadgets import chromosomes_37 as chromosomes
 from ..tools._gadgets import chrom_sort_dict_37 as chrom_sort_dict
+from ..tools._gadgets import mask_path_37 as mask_path
 from ..tools._gadgets import satellite_path_37 as satellite_path
+filter_pr = pr.read_bed(satellite_path).set_union(pr.read_bed(mask_path))
 
-satellite_pr = pr.read_bed(satellite_path)
-bad_pr = pr.PyRanges(chromosomes='2', starts=[33141145], ends=[33141699])
-filter_pr = satellite_pr.set_union(bad_pr)
 
 def read_filter_basic(read):
     '''
@@ -70,7 +69,7 @@ def bam_to_readdict(bam, chr1, pos1, left_margin, right_margin, readdict_limit=2
     else:
         readdict = sort_readdict(readdict)
         return readdict
-    print_err(f"# readdict exceeded {readdict_limit=} keys") # here we can skip add_mate_to_readdict using a for-else block
+    print_err(f"# readdict exceeded {readdict_limit=} keys : {chr1=} {pos1=} {left_margin=} {right_margin=}") # here we can skip add_mate_to_readdict using a for-else block
     readdict = sort_readdict(readdict)
     return readdict
 
@@ -138,7 +137,7 @@ def calculate_sv_vaf(chr1, pos1, chr2, pos2, ct, isize, bam):
         is_overlap = False
     if len(pr.PyRanges(chromosomes=[chr1, chr2], starts=[pos1, pos2], ends=[pos1, pos2]).intersect(filter_pr, how='containment')) > 0:
         print_err(chr1, pos1, chr2, pos2, 'satellite', sep='\t')
-        return None, None, is_overlap
+        return None, None, None, None, None, is_overlap
     
     left_margin, right_margin = isize, isize
     start_time = datetime.now()
@@ -156,12 +155,14 @@ def calculate_sv_vaf(chr1, pos1, chr2, pos2, ct, isize, bam):
     dc_reads = find_discordant_readname(bp_1, pos1, bp_2, pos2, ct)
     sv_reads = sa_reads.union(dc_reads)
     num_sv_reads = len(sv_reads)
-    vaf1 = get_vaf(num_sv_reads, len(bp_1_ref))
-    vaf2 = get_vaf(num_sv_reads, len(bp_2_ref))
+    num_ref1_reads = len(bp_1_ref)
+    num_ref2_reads = len(bp_2_ref)
+    vaf1 = get_vaf(num_sv_reads, num_ref1_reads)
+    vaf2 = get_vaf(num_sv_reads, num_ref2_reads)
     other_time = datetime.now() - start_time
 
     print_err(chr1, pos1, chr2, pos2, bp_1_time, bp_2_time, other_time, sep='\t')
-    return vaf1, vaf2, is_overlap
+    return num_sv_reads, num_ref1_reads, num_ref2_reads, vaf1, vaf2, is_overlap
 
 
 

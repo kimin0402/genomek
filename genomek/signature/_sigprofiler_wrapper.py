@@ -266,7 +266,7 @@ def _plot_decomposition(sample_DF, sample_name, sigDatabases_DF, sig_names, weig
     return img
 
 
-def sample_decomposition(sample, signatures=None, mtype="", genome_build="GRCh37", add_penalty=0.05, remove_penalty=0.01, mutation_context=None, connected_sigs=True, make_decomposition_plots=True, originalProcessAvg=None):
+def sample_decomposition(sample, signatures=None, mtype="", genome_build="GRCh37", background_sigs=[0,4], permanent_sigs=[0,4], add_penalty=0.05, remove_penalty=0.01, mutation_context=None, connected_sigs=True, make_decomposition_plots=True, originalProcessAvg=None):
     '''
     Wrapper function edited from SigProfilerExtractor.subroutines.signature_decomposition
     Takes one dataframe of original mutation count, and optionally takes a dataframe of custom signatures other than cosmic (signatures, default None).
@@ -355,8 +355,8 @@ def sample_decomposition(sample, signatures=None, mtype="", genome_build="GRCh37
                                                                                              sample_array, 
                                                                                              metric="l2", 
                                                                                              solver="nnls", 
-                                                                                             background_sigs = [0,4], 
-                                                                                             permanent_sigs = [0,4], 
+                                                                                             background_sigs = background_sigs, 
+                                                                                             permanent_sigs = permanent_sigs, 
                                                                                              candidate_sigs="all", 
                                                                                              allsigids = signames, 
                                                                                              add_penalty = add_penalty, 

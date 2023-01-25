@@ -367,7 +367,7 @@ class step1_wrapper(worker):
 					
 			return target_start1, target_end1, target_start2, target_end2
 		
-		# get_fetchrange main
+		# MAIN
 		start1, end1, start2, end2 = \
 			get_start12_end12(self.sv_type, self.ter1, self.ter2, self.pos1, self.pos2, self.dist)
 		target_start1, target_end1, target_start2, target_end2 = \
@@ -1098,11 +1098,12 @@ class amount_discordant(worker):
 		
 def set_constants(refver):
 	# set satellite regions and primary contigs
+	satellite_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 	if refver == '19':
-		satellite_path = "/home/users/hspark/Scripts/structural_variation/gremlin/data/excluded_region/satellite_hg19.bed.gz"
+		satellite_path = satellite_path + '/data/excluded_region/satellite_hg19.bed.gz'
 		primary_contigs = [ str(x) for x in list(range(1, 23)) + ['X', 'Y'] ]
 	elif refver == '38':
-		satellite_path = "/home/users/hspark/Scripts/structural_variation/gremlin/data/excluded_region/satellite_hg38.bed.gz"
+		satellite_path = satellite_path + '/data/excluded_region/satellite_hg38.bed.gz'
 		primary_contigs = [ 'chr'+str(x) for x in list(range(1, 23)) + ['X', 'Y'] ]
 
 	pr_satellite = pr.read_bed(satellite_path)

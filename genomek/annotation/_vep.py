@@ -298,3 +298,28 @@ def df_to_maf_df(df, prefix='VEP_'):
     result_df['Gene_Id'] = df[f'{prefix}Gene']
     result_df['i_transcript_name'] = df[f'{prefix}Feature']
     return result_df
+
+
+def GetVariantClassification_from_df(effect, ref, alt):
+    ## Effect
+    if effect:
+        effect = sorted(effect.split(','), key=lambda x: effectPriority.get(x, 21))[0]
+    else:
+        effect = 'intergenic_variant'
+    ## Variant_Type
+    if len(ref) == len(alt):
+        if len(ref) == 1:
+            Variant_Type = 'SNP'
+        elif len(ref) == 2:
+            Variant_Type = 'DNP'
+        elif len(ref) == 3:
+            Variant_Type = 'TNP'
+        elif len(ref) >= 4:
+            Variant_Type = 'ONP'
+    elif len(ref) > len(alt):
+        Variant_Type = 'DEL'
+    elif len(ref) < len(alt):
+        Variant_Type = 'INS'
+    ## inframe
+    inframe = True if abs(len(ref)-len(alt)) % 3 == 0 else False
+    return GetVariantClassification(effect, Variant_Type, inframe)

@@ -14,6 +14,10 @@ chrom_sort_dict_37 = {k:v for k,v in zip(chromosomes_37, range(len(chromosomes_3
 satellite_path_37 = "/home/users/kimin/projects/00_Reference/repeatmasker/GRCh37.rmsk.satellite.bed"
 mask_path_37 = "/home/users/kimin/projects/00_Reference/repeatmasker/GRCh37.kimin.mask.bed"
 ## mask_path_37 was created from this notebook -> /home/users/kimin/projects/07_Gastric_Cancer/20221008_pon_satellite_study.ipynb 
+## mask_path_37 essentially masks high coverage satellite regions
+kmask_path_37 = "/home/users/kimin/projects/00_Reference/unimask_kimin/hs37d5.kmask.bed"
+## kmask_path_37 was created from this notebook -> /home/users/kimin/projects/07_Gastric_Cancer/20221019_filtering_strategy_general.ipynb 
+## kmask_path_37 masks sdust and complex regions
 fasta_37 = pysam.FastaFile("/home/users/data/01_reference/human_g1k_v37/human_g1k_v37.fasta")
 
 
@@ -27,6 +31,13 @@ def memory_usage():
     memoryUse1 = py.memory_info()[0]/2.**30  # memory use in GB...I think
     print('\n************** Reported Current Memory Use: '+ str(round(memoryUse1,2))+" GB *****************\n") 
     #print('\n************** Reported Current Memory Use: '+ str(round(memoryUse2,2))+" GB *****************\n")
+
+
+from itertools import chain, combinations
+def powerset(iterable):
+    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
 
 
 def perm(n, seq):

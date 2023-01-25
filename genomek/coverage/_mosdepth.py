@@ -52,10 +52,21 @@ def bam_to_cov(bam_path: str, bed_path: str, quality: int=30, threads: int=4) ->
         summary_path = f"{tempdir}/mosdepth_temp.mosdepth.summary.txt"
         cmd = f"{mosdepth_path} -n -t {threads} -Q {quality} -b {bed_path} {output_prefix} {bam_path}"
         subprocess.run(cmd, shell=True)
-        df = pd.read_csv(output_path, sep='\t', compression='gzip', header=None, index_col=None, names=['CHROM', 'start', 'end', 'GC', 'cov'],
-                     dtype={'CHROM': chrom_cat_type, 'start': int, 'end': int, 'cov': float}) #, quotechar='"', error_bad_lines=False)
+        df = pd.read_csv(output_path, sep='\t', compression='gzip', header=None, index_col=None, names=['Chromosome', 'Start', 'End', 'GC', 'cov'],
+                     dtype={'Chromosome': chrom_cat_type, 'Start': int, 'End': int, 'cov': float}) #, quotechar='"', error_bad_lines=False)
         avg_depth_mosdepth, MT_depth_mosdepth = mosdepth_summary_to_info(summary_path)
 
     return df, avg_depth_mosdepth, MT_depth_mosdepth
 
 
+
+def get_foldback_n(bam, chrom, start, end):
+    '''
+    calculate number of foldback reads in the given segment
+    '''
+    n = 0
+    for read in bam.fetch(contig=chrom, start=start, end=end):
+        if read.is_duplicate or read.is_qcfail or read.mate_is_unmapped or read.is_unmapped: continue
+        if read.is_reverse == read.mate_is_reverse and read.reference_name == read.next_reference_name and read.template_length <= 5000:
+            n += 1
+    return n

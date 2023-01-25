@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 # List of requirements
-requirements = ['pysam>=0.16.0.1', 'cyvcf2>=0.30.1', 'SigProfilerExtractor', 'SigProfilerMatrixGenerator', 'sigproSS', 'pdf2image', 'pyranges', 'matplotlib_venn', 'ven', 'biopython', 'cachetools']  # This could be retrieved from requirements.txt
+requirements = ['pysam>=0.16.0.1', 'cyvcf2>=0.30.1', 'SigProfilerExtractor', 'SigProfilerMatrixGenerator', 'sigproSS', 'pdf2image', 'pyranges', 'matplotlib_venn', 'venn', 'biopython', 'cachetools']  # This could be retrieved from requirements.txt
 
 # Package (minimal) configuration
 setup(
