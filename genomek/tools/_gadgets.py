@@ -11,14 +11,14 @@ chromosomes_38 = ['chr'+str(i) for i in list(range(1, 23)) + ['X', 'Y', 'M']]
 chrom_cat_type_37 = CategoricalDtype(categories=chromosomes_37, ordered=True)
 chrom_cat_type_38 = CategoricalDtype(categories=chromosomes_38, ordered=True)
 chrom_sort_dict_37 = {k:v for k,v in zip(chromosomes_37, range(len(chromosomes_37)))}
-satellite_path_37 = "/home/users/kimin/projects/00_Reference/repeatmasker/GRCh37.rmsk.satellite.bed"
-mask_path_37 = "/home/users/kimin/projects/00_Reference/repeatmasker/GRCh37.kimin.mask.bed"
+satellite_path_37 = "/home/kimin/projects/00_Reference/repeatmasker/GRCh37.rmsk.satellite.bed"
+mask_path_37 = "/home/kimin/projects/00_Reference/repeatmasker/GRCh37.kimin.mask.bed"
 ## mask_path_37 was created from this notebook -> /home/users/kimin/projects/07_Gastric_Cancer/20221008_pon_satellite_study.ipynb 
 ## mask_path_37 essentially masks high coverage satellite regions
-kmask_path_37 = "/home/users/kimin/projects/00_Reference/unimask_kimin/hs37d5.kmask.bed"
+kmask_path_37 = "/home/kimin/projects/00_Reference/unimask/hs37d5.kmask.bed"
 ## kmask_path_37 was created from this notebook -> /home/users/kimin/projects/07_Gastric_Cancer/20221019_filtering_strategy_general.ipynb 
 ## kmask_path_37 masks sdust and complex regions
-fasta_37 = pysam.FastaFile("/home/users/data/01_reference/human_g1k_v37/human_g1k_v37.fasta")
+fasta_37 = pysam.FastaFile("/home/kimin/projects/00_Reference/human_g1k_v37.fasta")
 
 
 

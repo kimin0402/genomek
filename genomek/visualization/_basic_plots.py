@@ -77,7 +77,7 @@ def process_chrom_pos_coord(coord: Union[str,list]=None, chrom: Union[str,list]=
 def genome_figure(coord: Union[str,list]=None, chrom: Union[str,list]=None, pos: Union[str,list]=None, 
                     figsize=None, figheight=0.5, figx=25_000_000, padding: float=None, axes_ratio: list=None,
                     n_samples=1, heatmap=False, 
-                    reference_fai="/home/users/data/01_reference/human_g1k_v37/human_g1k_v37.fasta.fai"):
+                    reference_fai="/home/kimin/projects/00_Reference/human_g1k_v37.fasta.fai"):
     '''
     chrom: list of strings where each string is a chromosome to draw
     pos: list of tuples. 
@@ -101,7 +101,7 @@ def genome_figure(coord: Union[str,list]=None, chrom: Union[str,list]=None, pos:
         pos_size_list = np.array(list(map(lambda x: abs(x[0]-x[1]), pos_result)))
     else : # coord is None and chrom is None and pos is None (default setting: draw all chromosomes with each of them covering whole ranges)
         plot_type = 'genome plot'
-        df_fai = pd.read_csv("/home/users/data/01_reference/human_g1k_v37/human_g1k_v37.fasta.fai", sep='\t', header=None, index_col=0, usecols=[0,1], nrows=24, names=['CHROM', 'size_int'] )
+        df_fai = pd.read_csv(reference_fai, sep='\t', header=None, index_col=0, usecols=[0,1], nrows=24, names=['CHROM', 'size_int'] )
         title_result = df_fai.index
         chrom_result = title_result
         pos_size_list = df_fai['size_int'].to_numpy()
@@ -174,7 +174,7 @@ def genome_figure(coord: Union[str,list]=None, chrom: Union[str,list]=None, pos:
 
 def genome_figure_(coord: Union[str,list]=None, chrom: Union[str,list]=None, pos: Union[str,list]=None, 
                     figsize=(20, 4), padding: float=None, axes_ratio: list=None,
-                    reference_fai="/home/users/data/01_reference/human_g1k_v37/human_g1k_v37.fasta.fai"):
+                    reference_fai="/home/kimin/projects/00_Reference/human_g1k_v37.fasta.fai"):
     '''
     legacy function
     
@@ -202,7 +202,7 @@ def genome_figure_(coord: Union[str,list]=None, chrom: Union[str,list]=None, pos
         pos_size_list = np.array(list(map(lambda x: abs(x[0]-x[1]), pos_result)))
     else : # coord is None and chrom is None and pos is None (default setting: draw all chromosomes with each of them covering whole ranges)
         plot_type = 'genome plot'
-        df_fai = pd.read_csv("/home/users/data/01_reference/human_g1k_v37/human_g1k_v37.fasta.fai", sep='\t', header=None, index_col=0, usecols=[0,1], nrows=24, names=['CHROM', 'size_int'] )
+        df_fai = pd.read_csv("/home/kimin/projects/00_Reference/human_g1k_v37.fasta.fai", sep='\t', header=None, index_col=0, usecols=[0,1], nrows=24, names=['CHROM', 'size_int'] )
         title_result = df_fai.index
         chrom_result = title_result
         pos_size_list = df_fai['size_int'].to_numpy()

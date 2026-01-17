@@ -121,7 +121,7 @@ def data_generation_96(df: pd.DataFrame, column_name: str, sample_id: str) -> pd
     '''
 
     df_96 = df[column_name].value_counts()
-    df_96 = pd.DataFrame(index=context_96_for_sigprofiler).join(df_96).fillna(0).rename(columns={column_name:sample_id})
+    df_96 = pd.DataFrame(index=context_96_for_sigprofiler).join(df_96).fillna(0).rename(columns={'count':sample_id})
     df_96.index.rename("MutationType", inplace=True)
     
     return df_96

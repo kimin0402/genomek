@@ -1,3 +1,7 @@
+### This is legacy wrapper script of old versions of Sigprofiler
+### This script is no longer used after 2025.11.12
+
+
 import os
 import sys
 import tempfile
@@ -5,22 +9,24 @@ import shutil
 import subprocess
 import collections
 import itertools
-import pkg_resources
-import io 
 import pandas as pd
 import numpy as np
+import pickle as pkl
 from SigProfilerMatrixGenerator.scripts import SigProfilerMatrixGeneratorFunc as matgen   
 from sigProfilerPlotting import sigProfilerPlotting as sigPlt_original
 from sigProfilerPlotting import sample_portrait as sigPlt_portrait
 from SigProfilerExtractor import subroutines as sub
+# from SigProfilerExtractor import single_sample as ss
+# from SigProfilerExtractor import PlotDecomposition as sp
+# from SigProfilerExtractor import SigProfilerPlottingMatrix as sigPlt
+import SigProfilerExtractor as cosmic
+from sigproSS import spss 
 from PyPDF2 import PdfFileMerger
 from PIL import Image, ImageDraw, ImageFont
 from pdf2image import convert_from_path
 
 
-def get_resource_path(filename):
-    """Get the absolute path to a resource file in this package"""
-    return pkg_resources.resource_filename(__name__, filename)
+paths = cosmic.__path__[0]
 
 
 

@@ -58,9 +58,9 @@ def check_interval_isin_pr(interval: pr.PyRanges, bed: pr.PyRanges) -> bool:
 
 def blat_a_sequence(sequence: str, sequence_name: str,
                     blat_path: str='/home/users/kimin/tools/blat/gfClient', 
-                    reference_dir_path: str="/home/users/kimin/projects/00_Reference/",
+                    reference_dir_path: str="/home/kimin/projects/00_Reference/",
                     port: int=2882, minScore: int=20, minIdentity: int=20) -> list:
-    NUMT_tsv_path = "/home/users/kimin/projects/12_MT/00_reference/GRCh37_NumtS.tsv"
+    NUMT_tsv_path = "/home/kimin/projects/00_reference/MT/GRCh37_NumtS.tsv"
     NUMT_pr = pr.PyRanges(df=pd.read_csv(NUMT_tsv_path, sep='\t', index_col=None, usecols=[1,2,3,6]))
     input_dict = {sequence_name: sequence}
     result = []

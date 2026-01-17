@@ -189,7 +189,7 @@ def df_to_vcf(df:pd.DataFrame, vcf_path:str, format_sample_separator:str=':::') 
 
 
 
-def _vcftotsv(vcf_path:str = "", info=None, format=None, sample=None, human=False, na="NA", use_category=True) -> pd.DataFrame:
+def _vcftotsv(vcf_path:str = "", info=None, format=None, sample=None, human=False, na="NA", hg38:bool=False, use_category=True) -> pd.DataFrame:
     '''
     vcf: Input vcf file path. May be vcf, vcf.gz, bcf, or bcf.gz.
     info: Comma-separated list of INFO fields to include. If not set, all fields are included.
@@ -321,7 +321,7 @@ def _vcftotsv(vcf_path:str = "", info=None, format=None, sample=None, human=Fals
         
         ofile.flush()    
 
-        df = read_vcf(ofile.name, use_category=use_category)
+        df = read_vcf(ofile.name, hg38=hg38, use_category=use_category)
 
     return df 
 
@@ -507,8 +507,8 @@ class tidydf:
 
 class df_vcf(DataFrame):
     @classmethod
-    def new(cls, vcf_path, info=None, format=None, sample=None, human=False, na="NA", use_category=True):
-        df = _vcftotsv(vcf_path=vcf_path, info=info, format=format, sample=sample, human=human, na=na, use_category=use_category)
+    def new(cls, vcf_path, info=None, format=None, sample=None, human=False, na="NA", hg38:bool= False, use_category=True):
+        df = _vcftotsv(vcf_path=vcf_path, info=info, format=format, sample=sample, human=human, na=na, hg38=hg38, use_category=use_category)
         df.__class__ = df_vcf
         df[['ID', 'QUAL', 'FILTER']] = df[['ID', 'QUAL', 'FILTER']].fillna('.')
         df.vcf_path = os.path.abspath(vcf_path)

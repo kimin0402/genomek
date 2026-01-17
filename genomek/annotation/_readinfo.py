@@ -6,10 +6,10 @@ from collections import defaultdict
 from ..tools import print_err
 
 satellite_pr_dict = {}
-satellite_pr_dict['37'] = pr.read_bed('/home/users/pjh/References/ucsc_RepeatMasker_files/hg19/custom_files/satellite_hg19_rename_slop_subt_sort.bed.gz')
-satellite_pr_dict['38'] = pr.read_bed('/home/users/pjh/References/ucsc_RepeatMasker_files/hg38/satellite_hg38_slop_subt_sort.bed.gz')
-stackDict_path = '/home/users/pjh/scripts/annotation/short_variants/max_readstack.txt'
-stackDict = {k:v for k, v in np.genfromtxt('/home/users/pjh/scripts/annotation/short_variants/max_readstack.txt', dtype=int)}
+# satellite_pr_dict['37'] = pr.read_bed('/home/users/pjh/References/ucsc_RepeatMasker_files/hg19/custom_files/satellite_hg19_rename_slop_subt_sort.bed.gz')
+# satellite_pr_dict['38'] = pr.read_bed('/home/users/pjh/References/ucsc_RepeatMasker_files/hg38/satellite_hg38_slop_subt_sort.bed.gz')
+# stackDict_path = '/home/users/pjh/scripts/annotation/short_variants/max_readstack.txt'
+# stackDict = {k:v for k, v in np.genfromtxt('/home/users/pjh/scripts/annotation/short_variants/max_readstack.txt', dtype=int)}
 
 
 def calculate_mean_med(x):
